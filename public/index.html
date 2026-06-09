@@ -4,15 +4,68 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Subir imagen a Cloudinary</title>
+
   <style>
-    body { font-family: Arial, sans-serif; background:#f1f5f9; margin:0; padding:40px; }
-    .container { max-width:600px; margin:auto; background:white; padding:24px; border-radius:18px; box-shadow:0 10px 30px #0002; }
-    input, button { width:100%; padding:12px; margin:10px 0; border-radius:10px; border:1px solid #cbd5e1; }
-    button { background:#0284c7; color:white; font-weight:bold; cursor:pointer; }
-    img { max-width:100%; border-radius:14px; margin-top:18px; }
-    .url { word-break:break-all; background:#e0f2fe; padding:12px; border-radius:10px; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+      margin: 0;
+      padding: 40px;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: white;
+      padding: 24px;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px #0002;
+    }
+
+    input,
+    button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+    }
+
+    button {
+      background: #0284c7;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    img {
+      max-width: 100%;
+      border-radius: 14px;
+      margin-top: 18px;
+    }
+
+    .url {
+      word-break: break-all;
+      background: #e0f2fe;
+      padding: 12px;
+      border-radius: 10px;
+    }
+
+    .galeria {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .galeria img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+    }
   </style>
 </head>
+
 <body>
   <div class="container">
     <h1>Subir imagen a Cloudinary</h1>
@@ -24,24 +77,91 @@
     </form>
 
     <p id="estado"></p>
+
+    <h3>Vista previa local:</h3>
+    <div id="preview"></div>
+
     <div id="resultado"></div>
+
+    <h3>Galería de imágenes subidas</h3>
+    <div id="galeria" class="galeria"></div>
   </div>
 
   <script>
     const form = document.getElementById("formUpload");
+    const inputImagen = document.getElementById("imagen");
     const estado = document.getElementById("estado");
     const resultado = document.getElementById("resultado");
+    const preview = document.getElementById("preview");
+    const galeria = document.getElementById("galeria");
 
     // En local puede ser: http://localhost:3000
-    // En Vercel puede quedar vacío si frontend y backend están en el mismo proyecto.
     const API_URL = "";
+
+    // RETO 1: VALIDAR TAMAÑO ANTES DE SUBIR
+    const MAX_SIZE = 5 * 1024 * 1024;
+
+    // RETO 4: TRANSFORMACIÓN CLOUDINARY
+  
+    function transformarUrlCloudinary(url) {
+      return url.replace(
+        "/upload/",
+        "/upload/w_400,f_auto,q_auto/"
+      );
+    }
+
+    // RETO 3: GALERÍA SIMPLE
+    function cargarGaleria() {
+      const imagenes = JSON.parse(localStorage.getItem("galeria")) || [];
+
+      galeria.innerHTML = imagenes.map(url => `
+        <img src="${transformarUrlCloudinary(url)}" alt="Imagen de galería">
+      `).join("");
+    }
+
+    inputImagen.addEventListener("change", () => {
+      const archivo = inputImagen.files[0];
+
+      preview.innerHTML = "";
+      resultado.innerHTML = "";
+      estado.textContent = "";
+
+      if (!archivo) return;
+
+      // RETO 1: VALIDAR TAMAÑO ANTES DE SUBIR
+      if (archivo.size > MAX_SIZE) {
+        estado.textContent = "La imagen no puede superar los 5 MB.";
+        inputImagen.value = "";
+        return;
+      }
+
+      // RETO 2: MOSTRAR VISTA PREVIA LOCAL
+      const urlLocal = URL.createObjectURL(archivo);
+
+      preview.innerHTML = `
+        <img src="${urlLocal}" alt="Vista previa local">
+      `;
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+
+      const archivo = inputImagen.files[0];
+
+      if (!archivo) {
+        estado.textContent = "Selecciona una imagen.";
+        return;
+      }
+
+      // RETO 1: VALIDAR TAMAÑO ANTES DE SUBIR
+      if (archivo.size > MAX_SIZE) {
+        estado.textContent = "La imagen no puede superar los 5 MB.";
+        return;
+      }
+
       estado.textContent = "Subiendo imagen...";
       resultado.innerHTML = "";
 
-      const archivo = document.getElementById("imagen").files[0];
       const formData = new FormData();
       formData.append("imagen", archivo);
 
@@ -57,16 +177,36 @@
           throw new Error(data.error || "Error desconocido");
         }
 
+        // RETO 4: TRANSFORMACIÓN CLOUDINARY
+        const urlOptimizada = transformarUrlCloudinary(data.url);
+
+        // RETO 3: GALERÍA SIMPLE
+        const imagenes = JSON.parse(localStorage.getItem("galeria")) || [];
+
+        imagenes.push(data.url);
+
+        localStorage.setItem("galeria", JSON.stringify(imagenes));
+
         estado.textContent = data.message;
+
         resultado.innerHTML = `
-          <h3>Imagen subida:</h3>
-          <img src="${data.url}" alt="Imagen subida" />
-          <p class="url">${data.url}</p>
+          <h3>Imagen subida optimizada:</h3>
+          <img src="${urlOptimizada}" alt="Imagen subida">
+          <p class="url">${urlOptimizada}</p>
         `;
+        // RETO 3: GALERÍA SIMPLE
+        cargarGaleria();
+
+        form.reset();
+        preview.innerHTML = "";
+
       } catch (error) {
         estado.textContent = "Error: " + error.message;
       }
     });
+
+    // RETO 3: GALERÍA SIMPLE    
+    cargarGaleria();
   </script>
 </body>
 </html>
